@@ -1,3 +1,3 @@
 # mpb-maps
 
-Processing and visualizing MPB mass attack data from BC and AB, Canada.
+Processing and visualizing mountain pine beetle mass attack data from BC and AB, Canada.
