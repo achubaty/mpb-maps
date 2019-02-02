@@ -50,6 +50,7 @@ suppressPackageStartupMessages({
   library(devtools)
   library(digest)
   library(fasterize)
+  library(future)
   library(magrittr)
   library(maps)
   library(mapdata)
@@ -67,6 +68,8 @@ suppressPackageStartupMessages({
   library(spatstat)
   library(RColorBrewer)
 })
+
+plan("multiprocess")
 
 rasterOptions(default = TRUE)
 rasterOptions(
@@ -110,7 +113,7 @@ if (!dir.exists(fig.path)) dir.create(fig.path)
 stopifnot(all(dir.exists(c(fig.path, maps.dir, rdata.path, work.dir))))
 
 ## additional options
-._NUM_CPUS_. <- parallel::detectCores() / 2 ## max cpus to use
+._NUM_CPUS_. <- min(parallel::detectCores() / 2, 16) ## max cpus to use
 
 # options below only need to be changed if you want to reprocess the data
 # - e.g., you get new MPB map data
@@ -173,6 +176,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
 
 ```{r import-maps-boreal}
 if (isTRUE(._MAPS_USERAW_.)) {
+  ## TODO: use prepInputs to get and load the boreal shapefile
   f <- file.path(maps.dir, "boreal", "NABoreal.shp")
   if (!file.exists(f)) {
     url <- "http://cfs.nrcan.gc.ca/common/boreal.zip"
@@ -184,7 +188,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
     lapply(files, load, envir = .GlobalEnv)
   } else {
     boreal <- read_sf(f) %>% st_transform(._CRS_MAPS_.)
-    boreal.can <- boreal[boreal$NAME_0 == "CANADA", ]
+    boreal.can <- boreal[boreal$COUNTRY == "CANADA", ]
     save(boreal, file = files[1])
     save(boreal.can, file = files[2])
   }
@@ -199,7 +203,8 @@ if (isTRUE(._MAPS_USERAW_.)) {
   canada1.boreal <- st_transform(CAN_adm1, ._CRS_MAPS_.)
   canada2.boreal <- st_transform(CAN_adm2, ._CRS_MAPS_.)
   
-  boreal.west <- st_intersection(boreal, west.boreal)# %>% st_buffer(., 0)
+  # boreal.west takes a long time, so put in another process
+  boreal.west %<-% st_intersection(boreal, west.boreal)# %>% st_buffer(., 0)
   
   f <- normalizePath(file.path(rdata.path, "west_boreal.shp"))
   st_write(west.boreal, f, delete_dsn = TRUE)
@@ -339,7 +344,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
       writeRaster(out, filename = fout, overwrite = TRUE)
       return(out)
     }) %>%
-      setNames(substr(sapply(strsplit(ab.pnts.dir.shp, "_"), function(x) x[[3]]), 1, 4)) %>%
+      set_names(substr(sapply(strsplit(ab.pnts.dir.shp, "_"), function(x) x[[3]]), 1, 4)) %>%
       stack(filename = file.path(rdata.path, "ab_pnts_boreal.grd"), overwrite = TRUE)
 
     # save these new map objects for later use
@@ -349,7 +354,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
   ## cleanup workspace
   rm(ab.pnts.dir.shp, ab.pnts.files, ab.pnts.boreal.raster.stack, west.boreal.raster)
   .gc()
-  unlink(rasterOptions()$tmpdir, recursive = TRUE)
+  unlink(tmpDir(), recursive = TRUE)
 }
 ```
 
@@ -573,7 +578,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
     sfLibrary(rgdal)
     sfLibrary(rgeos)
     sfLibrary(sp)
-    sfExport("._RES_MAPS_.", "._CRS_MAPS_.", "maps.dir", "output.dir", "rdata.path", "west.boreal.raster")
+    sfExport("._CRS_MAPS_.", "._RES_MAPS_.", "maps.dir", "output.dir", "rdata.path", "west.boreal.raster")
     
     ## in parallel: load, reproject, and rasterize each of the BC polygons
     #  do as much as possible in a single step (don't save intermediate objects) to minimize RAM use.
@@ -605,10 +610,10 @@ if (isTRUE(._MAPS_USERAW_.)) {
       writeRaster(out, filename = file.path(rdata.path, paste0("MPB_BC_poly_", yr, ".tif")),
                   overwrite = TRUE)
       
-      unlink(f)
+      try(unlink(f))
       return(out)
     }) %>% 
-      setNames(sapply(strsplit(bc.poly.dir.shp, "_"), function(x) x[[3]])) %>%
+      set_names(sapply(strsplit(bc.poly.dir.shp, "_"), function(x) x[[3]])) %>%
       stack(filename = file.path(rdata.path, "bc_poly_boreal.grd"), overwrite = TRUE)
 
     # save these new map objects for later use 
@@ -618,7 +623,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
   # clean up workspace 
   rm(bc.poly.dir.shp, bc.poly.files) 
   .gc()
-  unlink(rasterOptions()$tmpdir, recursive = TRUE)
+  unlink(tmpDir(), recursive = TRUE)
 }
 ```
 
@@ -680,7 +685,7 @@ if (isTRUE(._MAPS_MKRSTR_.)) {
   ## cleanup workspace
   rm(bcab.boreal.raster.brick, bcab.boreal.raster.stack)
   .gc()
-  unlink(rasterOptions()$tmpdir, recursive = TRUE)
+  unlink(tmpDir(), recursive = TRUE)
 }
 ```
 
