@@ -210,7 +210,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
   st_write(west.boreal, f, delete_dsn = TRUE)
   fout <- normalizePath(file.path(rdata.path, "west_boreal.tif"), mustWork = FALSE)
   west.boreal.raster <- fasterize(west.boreal, raster(west.boreal, res = ._RES_MAPS_.))
-  writeRaster(west.boreal.raster, filename = fout)
+  writeRaster(west.boreal.raster, filename = fout, overwrite = TRUE)
   writeRaster(west.boreal.raster, filename = extension(fout, ".grd"), overwrite = TRUE)
   rm(f, fout)
 
