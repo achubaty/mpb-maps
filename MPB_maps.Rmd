@@ -584,7 +584,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
       poly.boreal <- getOGR(shp, output.dir) %>% 
         ## reproject to boreal projection
         spTransform(., CRS(._CRS_MAPS_.$proj4string)) %>%
-        gBuffer(., byid = TRUE, width = 0)
+        fixErrors(objectName = "poly.boreal")
     
       stopifnot(gIsValid(poly.boreal))
     
