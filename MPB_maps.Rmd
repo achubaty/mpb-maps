@@ -162,11 +162,16 @@ cat(readLines(metadata), sep = '\n')
 
 ```{r can_adm}
 if (isTRUE(._MAPS_USERAW_.)) {
-  adm.path <- file.path(maps.dir, "CAN_adm")
-  if (!dir.exists(adm.path)) dir.create(adm.path)
+  adm.path <- file.path(maps.dir, "CAN_adm") %>% checkPath(create = TRUE)
+  
+  # canProvs <- Cache(prepInputs, dlFun = "getData", "GADM", country = "CAN",
+  #                   level = 1, path = adm.path,
+  #                   targetFile = "gadm36_CAN_1_sp.rds", ## TODO: this will change as GADM data update
+  #                   fun = "base::readRDS")
+  
   for (s in 0:3) {
     assign(paste0("CAN_adm", s),
-           as(raster::getData('GADM', path = adm.path, country = "Canada", level = s), "sf"),
+           as(raster::getData("GADM", path = adm.path, country = "Canada", level = s), "sf"),
            envir = .GlobalEnv)
     save(list = paste0("CAN_adm", s), file = file.path(adm.path, paste0("CAN_adm", s, ".Rdata")))
   }
@@ -177,12 +182,21 @@ if (isTRUE(._MAPS_USERAW_.)) {
 
 ```{r import-maps-boreal}
 if (isTRUE(._MAPS_USERAW_.)) {
-  ## TODO: use prepInputs to get and load the boreal shapefile
-  f <- file.path(maps.dir, "boreal", "NABoreal.shp")
-  if (!file.exists(f)) {
-    url <- "http://cfs.nrcan.gc.ca/common/boreal.zip"
-    dl.data(url, dest = maps.dir, unzip = TRUE)
-  }
+  # west <- canProvs[canProvs$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
+  # west <- Cache(postProcess, west, targetCRS = mod$prj, filename2 = NULL)
+  # 
+  # 
+  # boreal <- Cache(prepInputs,
+  #                 targetFile = "NABoreal.shp",
+  #                 alsoExtract = "similar",
+  #                 archive = asPath("boreal.zip"),
+  #                 destinationPath = maps.dir,
+  #                 url = "http://cfs.nrcan.gc.ca/common/boreal.zip",
+  #                 fun = "sf::read_sf",
+  #                 useSAcrs = TRUE,
+  #                 studyArea = west,
+  #                 filename2 = NULL,
+  #                 userTags = c("stable", currentModule(sim), "NorthAmericanBoreal"))
   
   files <- file.path(rdata.path, c("boreal.RData", "boreal.can.RData"))
   if (all(file.exists(files))) {
