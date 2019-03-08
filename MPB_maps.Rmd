@@ -242,6 +242,28 @@ if (isTRUE(._MAPS_USERAW_.)) {
 }
 ```
 
+## MPB Stand Susceptibility Index
+
+```{r mpb_ssi}
+if (isTRUE(._MAPS_USERAW_.) && (._OS_. == "Windows") &&
+    (NROW(subset(ogrDrivers(), grepl("GDB", name))) > 0)) {
+  f <- file.path(maps.dir, "MPB", "Mountain_Pine_Beetle_SSI.gdb")
+  stopifnot(file.exists(f))
+  
+  ## List all feature classes in a file geodatabase
+  fc_list <- ogrListLayers(f)
+  print(fc_list)
+  
+  fc <- st_read(dsn = f, layer = "STAND_SUSC_INDEX_MPB")
+  
+  ## save to shapefiles
+  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_ssi") %>% checkPath(create = TRUE)
+  
+  fout <- file.path(output.dir, "ab_mpb_ssi.shp")
+  write_sf(fc, dsn = fout)
+}
+```
+
 ## MPB red attack data
 
 ### AB `SpatialPoints` and `SpatialPolygons` data
@@ -263,7 +285,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
 ## GDAL can only open GDB files on Windows
 if (isTRUE(._MAPS_USERAW_.) && (._OS_. == "Windows") &&
     (NROW(subset(ogrDrivers(), grepl("GDB", name))) > 0)) {
-  f <- file.path(maps.dir, "MPB/MPB_AERIAL_SURVEY.gdb")
+  f <- file.path(maps.dir, "MPB", "MPB_AERIAL_SURVEY.gdb")
   stopifnot(file.exists(f))
   
   ## List all feature classes in a file geodatabase
