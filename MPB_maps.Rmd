@@ -75,7 +75,7 @@ plan("multiprocess")
 rasterOptions(default = TRUE)
 rasterOptions(
   maxmem = 1e+12,
-  tmpdir = checkPath(file.path(dirname(tempdir()), "scratch", "MPB"), create = TRUE)
+  tmpdir = checkPath(file.path("/mnt/scratch/MPB"), create = TRUE)
 )
 
 ## additional helper functions
@@ -194,16 +194,16 @@ if (isTRUE(._MAPS_USERAW_.)) {
     lapply(files, load, envir = .GlobalEnv)
   } else {
     boreal <- Cache(prepInputs,
-                targetFile = "NABoreal.shp",
-                alsoExtract = "similar",
-                archive = asPath("boreal.zip"),
-                destinationPath = maps.dir,
-                url = "http://cfs.nrcan.gc.ca/common/boreal.zip",
-                fun = "sf::read_sf",
-                useSAcrs = TRUE,
-                studyArea = west,
-                filename2 = NULL,
-                userTags = c("stable", "NorthAmericanBoreal"))
+                    targetFile = "NABoreal.shp",
+                    alsoExtract = "similar",
+                    archive = asPath("boreal.zip"),
+                    destinationPath = maps.dir,
+                    url = "http://cfs.nrcan.gc.ca/common/boreal.zip",
+                    fun = "sf::read_sf",
+                    useSAcrs = TRUE,
+                    studyArea = west,
+                    filename2 = NULL,
+                    userTags = c("stable", "NorthAmericanBoreal"))
     boreal.can <- boreal[boreal$COUNTRY == "CANADA", ]
     save(boreal, file = files[1])
     save(boreal.can, file = files[2])
