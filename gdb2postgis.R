@@ -1,13 +1,13 @@
 readRenviron(".Renviron")
 
-library(RPostgreSQL)
+library(RPostgres)
 library(rgdal)
 library(sf)
 
 stopifnot(Sys.info()[["sysname"]] == "Windows") ## R can only work with .gdb files on Windows
 subset(st_drivers(), grepl("GDB", name))
 
-conn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
+conn <- DBI::dbConnect(drv = RPostgres::Postgres(),
                        host = Sys.getenv("PGHOST"),
                        port = Sys.getenv("PGPORT"),
                        dbname = Sys.getenv("PGDATABASE"),
@@ -16,27 +16,29 @@ conn <- DBI::dbConnect(drv = RPostgreSQL::PostgreSQL(),
 
 dataDir <- ifelse(peutils::user("Alex Chubaty"), "Z:/MPB", "data")
 
+write2db <- function(x, f, conn) {
+  yr_ <- substr(x, 10, 11)
+  yr_ <- ifelse(yr_ > 50, paste0(19, yr_), paste0(20, yr_))
+  polypnts <- ifelse(substr(x, 12, 12) == "x", "points", "polygons")
+
+  tmp <- st_read(f, layer = x)
+  st_crs(tmp) <- 3400
+  st_write(tmp, conn, layer = paste0("MPB_AB_", yr_, polypnts))
+  rm(tmp)
+}
+
 ## ---------------------------------------------------------------------------------------------- ##
 
-f_mpb <- normalizePath(file.path(dataDir, "MPB_AERIAL_SURVEY_2018.gdb"))
-stopifnot(file.exists(f_mpb))
+f_mpb_2018 <- normalizePath(file.path(dataDir, "MPB_AERIAL_SURVEY_2018.gdb"))
+stopifnot(file.exists(f_mpbf_mpb_2018))
 
-fc_list <- ogrListLayers(f_mpb)
+fc_list <- ogrListLayers(f_mpb_2018)
 print(fc_list) ## points are 'x' features; polygons are 'p'
 
 sort(unique(substr(fc_list, 10, 12)))
-
 #years <- c(1975L:1987L, 1989L:1991L, 1994L, 1998L, 2001L:2018L)
 
-mpb <- lapply(fc_list, function(lay) {
-  yr_ <- substr(lay, 10, 11)
-  yr_ <- ifelse(yr_ > 50, paste0(19, yr_), paste0(20, yr_))
-  polypnts <- ifelse(substr(lay, 12, 12) == "x", "points", "polygons")
-
-  tmp <- st_read(f_mpb, layer = lay)
-  st_write(tmp, conn, layer = paste0("MPB_AB_", yr_, polypnts))
-  rm(tmp)
-})
+mpb <- lapply(fc_list, write2db, f = f_mpb_2018, conn = conn)
 
 ## ---------------------------------------------------------------------------------------------- ##
 
@@ -46,12 +48,4 @@ stopifnot(file.exists(f_mpb_2019))
 fc_list <- ogrListLayers(f_mpb_2019)
 print(fc_list)
 
-mpb <- lapply(fc_list, function(lay) {
-  yr_ <- substr(lay, 10, 11)
-  yr_ <- ifelse(yr_ > 50, paste0(19, yr_), paste0(20, yr_))
-  polypnts <- ifelse(substr(lay, 12, 12) == "x", "pnts", "poly")
-
-  tmp <- st_read(f_mpb, layer = lay)
-  st_write(tmp, conn, layer = paste0("MPB_AB_", yr_, "_", polypnts))
-  rm(tmp)
-})
+mpb <- lapply(fc_list, write2db, f = f_mpb_2019, conn = conn)
