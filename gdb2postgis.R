@@ -19,7 +19,7 @@ dataDir <- ifelse(peutils::user("Alex Chubaty"), "Z:/MPB", "data")
 write2db <- function(x, f, conn) {
   yr_ <- substr(x, 10, 11)
   yr_ <- ifelse(yr_ > 50, paste0(19, yr_), paste0(20, yr_))
-  polypnts <- ifelse(substr(x, 12, 12) == "x", "points", "polygons")
+  polypnts <- ifelse(substr(x, 12, 12) == "x", "pnts", "poly")
 
   tmp <- st_read(f, layer = x)
   st_crs(tmp) <- 3400
@@ -30,22 +30,22 @@ write2db <- function(x, f, conn) {
 ## ---------------------------------------------------------------------------------------------- ##
 
 f_mpb_2018 <- normalizePath(file.path(dataDir, "MPB_AERIAL_SURVEY_2018.gdb"))
-stopifnot(file.exists(f_mpbf_mpb_2018))
+stopifnot(file.exists(f_mpb_2018))
 
-fc_list <- ogrListLayers(f_mpb_2018)
-print(fc_list) ## points are 'x' features; polygons are 'p'
+fc_list_2018 <- ogrListLayers(f_mpb_2018)
+print(fc_list_2018) ## points are 'x' features; polygons are 'p'
 
 sort(unique(substr(fc_list, 10, 12)))
 #years <- c(1975L:1987L, 1989L:1991L, 1994L, 1998L, 2001L:2018L)
 
-mpb <- lapply(fc_list, write2db, f = f_mpb_2018, conn = conn)
+mpb <- lapply(fc_list_2018, write2db, f = f_mpb_2018, conn = conn)
 
 ## ---------------------------------------------------------------------------------------------- ##
 
 f_mpb_2019 <- normalizePath(file.path(dataDir, "MPB_AERIAL_SURVEY_2019.gdb"))
 stopifnot(file.exists(f_mpb_2019))
 
-fc_list <- ogrListLayers(f_mpb_2019)
-print(fc_list)
+fc_lis_2019t <- ogrListLayers(f_mpb_2019)
+print(fc_list2019)
 
-mpb <- lapply(fc_list, write2db, f = f_mpb_2019, conn = conn)
+mpb <- lapply(fc_list_2019, write2db, f = f_mpb_2019, conn = conn)
