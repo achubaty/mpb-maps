@@ -23,7 +23,7 @@ write2db <- function(x, f, conn) {
 
   tmp <- st_read(f, layer = x)
   st_crs(tmp) <- 3400
-  st_write(tmp, conn, layer = paste0("MPB_AB_", yr_, polypnts))
+  st_write(tmp, conn, layer = paste0("MPB_AB_", yr_, "_", polypnts))
   rm(tmp)
 }
 
@@ -45,7 +45,11 @@ mpb <- lapply(fc_list_2018, write2db, f = f_mpb_2018, conn = conn)
 f_mpb_2019 <- normalizePath(file.path(dataDir, "MPB_AERIAL_SURVEY_2019.gdb"))
 stopifnot(file.exists(f_mpb_2019))
 
-fc_lis_2019t <- ogrListLayers(f_mpb_2019)
+fc_lis_2019 <- ogrListLayers(f_mpb_2019)
 print(fc_list2019)
 
-mpb <- lapply(fc_list_2019, write2db, f = f_mpb_2019, conn = conn)
+mpb_2019 <- lapply(fc_list_2019, write2db, f = f_mpb_2019, conn = conn)
+
+## ---------------------------------------------------------------------------------------------- ##
+
+mpb <- append(mpb, mpb_2019)
