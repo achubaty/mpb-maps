@@ -45,7 +45,7 @@ mpb <- lapply(fc_list_2018, write2db, f = f_mpb_2018, conn = conn)
 f_mpb_2019 <- normalizePath(file.path(dataDir, "MPB_AERIAL_SURVEY_2019.gdb"))
 stopifnot(file.exists(f_mpb_2019))
 
-fc_lis_2019 <- ogrListLayers(f_mpb_2019)
+fc_list_2019 <- ogrListLayers(f_mpb_2019)
 print(fc_list2019)
 
 mpb_2019 <- lapply(fc_list_2019, write2db, f = f_mpb_2019, conn = conn)
