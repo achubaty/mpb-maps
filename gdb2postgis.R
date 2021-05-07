@@ -48,3 +48,20 @@ print(fc_list_2019)
 mpb_2019 <- lapply(fc_list_2019, write2db, f = f_mpb_2019, conn = conn)
 
 mpb <- append(mpb, mpb_2019)
+
+## ---------------------------------------------------------------------------------------------- ##
+
+f <- normalizePath(file.path(dataDir, "Mountain_Pine_Beetle_SSI.gdb"))
+
+## List all feature classes in a file geodatabase
+fc_list <- ogrListLayers(f)
+print(fc_list)
+
+ssi <- st_read(dsn = f, layer = "STAND_SUSC_INDEX_MPB")
+
+st_write(ssi, conn, layer = "MPB_AB_SSI")
+
+## save to shapefiles
+dout <- file.path(dataDir, "ab_mpb_ssi") %>% checkPath(create = TRUE)
+fout <- file.path(dout, "ab_mpb_ssi.shp")
+write_sf(ssi, dsn = fout)
