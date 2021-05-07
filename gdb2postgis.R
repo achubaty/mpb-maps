@@ -1,8 +1,7 @@
 readRenviron(".Renviron")
 
-library(RPostgres)
-library(rgdal)
-library(sf)
+library(Require)
+Require(c("RPostgres", "rgdal", "sf", "ggplot2", "ggspatial"))
 
 stopifnot(Sys.info()[["sysname"]] == "Windows") ## R can only work with .gdb files on Windows
 subset(st_drivers(), grepl("GDB", name))
@@ -35,21 +34,17 @@ stopifnot(file.exists(f_mpb_2018))
 fc_list_2018 <- ogrListLayers(f_mpb_2018)
 print(fc_list_2018) ## points are 'x' features; polygons are 'p'
 
-sort(unique(substr(fc_list, 10, 12)))
+sort(unique(substr(fc_list_2018, 10, 12)))
 #years <- c(1975L:1987L, 1989L:1991L, 1994L, 1998L, 2001L:2018L)
 
 mpb <- lapply(fc_list_2018, write2db, f = f_mpb_2018, conn = conn)
-
-## ---------------------------------------------------------------------------------------------- ##
 
 f_mpb_2019 <- normalizePath(file.path(dataDir, "MPB_AERIAL_SURVEY_2019.gdb"))
 stopifnot(file.exists(f_mpb_2019))
 
 fc_list_2019 <- ogrListLayers(f_mpb_2019)
-print(fc_list2019)
+print(fc_list_2019)
 
 mpb_2019 <- lapply(fc_list_2019, write2db, f = f_mpb_2019, conn = conn)
-
-## ---------------------------------------------------------------------------------------------- ##
 
 mpb <- append(mpb, mpb_2019)
