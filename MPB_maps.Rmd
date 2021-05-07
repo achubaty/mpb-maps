@@ -33,8 +33,9 @@ knitr::opts_chunk$set(cache = TRUE, cache.path = "cache/", echo = FALSE,
 ## attach packages
 suppressPackageStartupMessages({
   library(Require)
-  Require(c("data.table", "fasterize", "future", "magrittr", "parallel", "raster", "reproducible",
-            "rgdal", "rgeos", "RPostgres", "sf", "sp", "stringr", "RColorBrewer"))
+  Require(c("data.table", "fasterize", "future", "ggplot2", "ggspatial", "magrittr", "parallel",
+            "raster", "RColorBrewer", "reproducible", "rgdal", "rgeos", "RPostgres",
+            "sf", "sp", "stringr"))
   Require("achubaty/amc@development")
 })
 
@@ -183,7 +184,9 @@ if (isTRUE(._MAPS_USERAW_.)) {
   canada2.boreal <- st_transform(st_as_sf(CAN_adm2), ._CRS_MAPS_.)
   
   # boreal.west takes a long time, so put in another process
-  boreal.west %<-% st_intersection(boreal, west.boreal) # %>% st_buffer(., 0)
+  boreal.west %<-% {
+    st_intersection(boreal, west.boreal) %>% st_buffer(., 0)
+  }
   
   f <- normalizePath(file.path(rdata.path, "west_boreal.shp"))
   st_write(west.boreal, f, delete_dsn = TRUE)
@@ -724,15 +727,13 @@ darkgreen <- col2rgb("darkgreen") / 255
 col.bor <- rgb(darkgreen[1], darkgreen[2], darkgreen[3], alpha = 0.5)
 rm(darkgreen)
 
-plot(canada1.boreal)
-plot(boreal.can, col = col.bor, add = TRUE)
+g <- ggplot(canada1.boreal) +
+  geom_sf() +
+  geom_sf(data = boreal.can, fill = col.bor, alpha = 0.5) ## TODO: why is this only AB/SK?
 
-png(file.path(fig.path, "boreal.can.png"), type = "cairo", width = 1600, height = 1200)
-plot(canada1.boreal)
-plot(boreal.can, col = col.bor, add = TRUE)
-dev.off()
+ggsave(file.path(fig.path, "boreal.can.png"), g, width = 16, height = 12)
 
-rm(boreal.can)
+rm(boreal.can, canada1.boreal)
 ```
 
 **The western Canadian boreal forest:**
@@ -743,13 +744,11 @@ darkgreen <- col2rgb("darkgreen") / 255
 col.bor <- rgb(darkgreen[1], darkgreen[2], darkgreen[3], alpha = 0.5)
 rm(darkgreen)
 
-plot(west.boreal)
-plot(boreal.west, col = col.bor, add = TRUE)
+g <- ggplot(west.boreal) +
+  geom_sf() +
+  geom_sf(data = st_as_sf(boreal.west), fill = col.bor, alpha = 0.5)
 
-png(file.path(fig.path, "boreal.west.png"), type = "cairo", width = 1600, height = 1200)
-plot(west.boreal)
-plot(boreal.west, col = col.bor, add = TRUE)
-dev.off()
+ggsave(file.path(fig.path, "boreal.west.png"), g, width = 16, height = 12)
 
 rm(boreal.west, west.boreal)
 ```
