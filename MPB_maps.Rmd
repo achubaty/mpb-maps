@@ -30,87 +30,50 @@ editor_options:
 knitr::opts_chunk$set(cache = TRUE, cache.path = "cache/", echo = FALSE,
                       message = FALSE, warning = FALSE, fig.path = "figures/")
 
+## attach packages
+suppressPackageStartupMessages({
+  library(Require)
+  Require(c("data.table", "fasterize", "future", "magrittr", "parallel", "raster", "reproducible",
+            "rgdal", "rgeos", "RPostgres", "sf", "sp", "stringr", "RColorBrewer"))
+  Require("achubaty/amc@development")
+})
+
+renviron <- c(".Renviron", "../.Renviron")
+if (any(file.exists(renviron))) {
+  f <- renviron[which(file.exists(renviron))][1]
+  readRenviron(f)
+
+  gisDBconn <- DBI::dbConnect(drv = RPostgres::Postgres(),
+                              host = Sys.getenv("PGHOST"),
+                              port = Sys.getenv("PGPORT"),
+                              dbname = Sys.getenv("PGDATABASE"),
+                              user = Sys.getenv("PGUSER"),
+                              password = Sys.getenv("PGPASSWORD"))
+} else {
+  gisDBconn <- NULL
+}
+
 ## determine OS and whether we are on a CFS machine
-._CFS_. <- grepl("W-VIC", Sys.info()[["nodename"]])
+._CFS_. <- grepl("W-VIC", Sys.info()[["nodename"]]) ## TODO: remove; obsolete
 ._OS_. <- Sys.info()[["sysname"]]
 ._USER_. <- Sys.info()[["user"]]
 
-## set R and knitr options
-if (isTRUE(._CFS_.)) {
-  options(repos = c(NRCRAN = "http://132.156.148.172",
-                    CRAN = "https://cran.rstudio.com/"))
-} else {
-  options(repos = c(CRAN = "https://cran.rstudio.com/"))
-}
+plan("multisession")
 
-## attach packages
-suppressPackageStartupMessages({
-  library(data.table)
-  library(devtools)
-  library(digest)
-  library(fasterize)
-  library(future)
-  library(magrittr)
-  library(maps)
-  library(mapdata)
-  library(maptools)
-  library(parallel)
-  library(plotKML)
-  library(raster)
-  library(reproducible)
-  library(rgdal)
-  library(rgeos)
-  library(rts)
-  library(sf)
-  library(shapefiles)
-  library(sp)
-  library(stringr)
-  library(spatstat)
-  library(RColorBrewer)
-})
-
-plan("multiprocess")
+scratchDir <- ifelse(dir.exists("/mnt/scratch"), "/mnt/scratch/MPB", file.path(dirname(tempdir()), "scratch/MPB")) %>% 
+  checkPath(., create = TRUE)
 
 rasterOptions(default = TRUE)
 rasterOptions(
   maxmem = 1e+12,
-  tmpdir = checkPath(file.path("/mnt/scratch/MPB"), create = TRUE)
+  tmpdir = scratchDir
 )
 
-## additional helper functions
-if (!require(amc) || packageVersion("amc") < "0.1.3.9002") {
-  devtools::install_github("achubaty/amc@development")
-}
-
 ## set work dirs based on computer used
-if (grepl("achubaty", ._USER_.)) {
-  if (._OS_. == "Darwin") {
-    maps.dir <- "~/Documents/shared"
+if (isTRUE(._USER_. == "achubaty")) {
+  if (._OS_. == "Linux") {
+    maps.dir <- "~/data"
     work.dir <- "~/Documents/GitHub/MPB/mpb-maps"
-  } else if (._OS_. == "Linux") {
-    if (isTRUE(._CFS_.)) {
-      maps.dir <- "/mnt/A105388/shared/data"
-    } else {
-      maps.dir <- "~/data/"
-    }
-    work.dir <- "~/Documents/GitHub/MPB/mpb-maps"
-  } else if (._OS_. == "Windows") {
-    if (isTRUE(._CFS_.)) {
-      if (grepl("W-VIC-A105254", Sys.info()[["nodename"]])) {
-        maps.dir <- "G:/data"
-      } else {
-        maps.dir <- "//W-VIC-A105388/shared/data"
-      }
-      work.dir <- "~/GitHub/MPB/mpb-maps"
-    } else if (grepl("HST-NRX-CTX-09", Sys.info()[["nodename"]])) {
-      maps.dir <- "W:/HealthyLandscapes/Data"
-      work.dir <- "~/GitHub/mpb-maps"
-    } else {
-      stop("data and maps dirs need to be specified for your system")
-    }
-    
-  } else {
-    stop("Which operating system are you using?")
   }
 }
 setwd(work.dir)
@@ -157,6 +120,8 @@ cat(readLines(metadata), sep = '\n')
 ```
 
 ### AB aerial surveys metadata
+
+<!-- TODO: get AB metadata -->
 
 ```{r ab-metadata, comment=""}
 #metadata <- file.path(maps.dir, "MPB", "bc_feds_pest_metatdata.TXT")
@@ -207,19 +172,19 @@ if (isTRUE(._MAPS_USERAW_.)) {
     save(boreal, file = files[1])
     save(boreal.can, file = files[2])
   }
-  rm(f, files)
+  rm(files)
   
   west.provs <- c("Alberta", "British Columbia", "Saskatchewan")
   canada1.west <- CAN_adm1[CAN_adm1$NAME_1 %in% west.provs, ]
   canada2.west <- CAN_adm2[CAN_adm2$NAME_1 %in% west.provs, ]
 
-  west.boreal <- st_transform(canada1.west, ._CRS_MAPS_.)
-  west2.boreal <- st_transform(canada2.west, ._CRS_MAPS_.)
-  canada1.boreal <- st_transform(CAN_adm1, ._CRS_MAPS_.)
-  canada2.boreal <- st_transform(CAN_adm2, ._CRS_MAPS_.)
+  west.boreal <- st_transform(st_as_sf(canada1.west), ._CRS_MAPS_.)
+  west2.boreal <- st_transform(st_as_sf(canada2.west), ._CRS_MAPS_.)
+  canada1.boreal <- st_transform(st_as_sf(CAN_adm1), ._CRS_MAPS_.)
+  canada2.boreal <- st_transform(st_as_sf(CAN_adm2), ._CRS_MAPS_.)
   
   # boreal.west takes a long time, so put in another process
-  boreal.west %<-% st_intersection(boreal, west.boreal)# %>% st_buffer(., 0)
+  boreal.west %<-% st_intersection(boreal, west.boreal) # %>% st_buffer(., 0)
   
   f <- normalizePath(file.path(rdata.path, "west_boreal.shp"))
   st_write(west.boreal, f, delete_dsn = TRUE)
@@ -244,6 +209,9 @@ if (isTRUE(._MAPS_USERAW_.)) {
 ## MPB Stand Susceptibility Index
 
 ```{r mpb_ssi}
+dout <- file.path(maps.dir, "MPB", "ab_mpb_ssi") %>% checkPath(create = TRUE)
+fout <- file.path(dout, "ab_mpb_ssi.shp")
+
 if (isTRUE(._MAPS_USERAW_.) && (._OS_. == "Windows") &&
     (NROW(subset(ogrDrivers(), grepl("GDB", name))) > 0)) {
   f <- file.path(maps.dir, "MPB", "Mountain_Pine_Beetle_SSI.gdb")
@@ -253,14 +221,16 @@ if (isTRUE(._MAPS_USERAW_.) && (._OS_. == "Windows") &&
   fc_list <- ogrListLayers(f)
   print(fc_list)
   
-  fc <- st_read(dsn = f, layer = "STAND_SUSC_INDEX_MPB")
+  ssi <- st_read(dsn = f, layer = "STAND_SUSC_INDEX_MPB")
   
-  ## save to shapefiles
-  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_ssi") %>% checkPath(create = TRUE)
-  
-  fout <- file.path(output.dir, "ab_mpb_ssi.shp")
-  write_sf(fc, dsn = fout)
+  write_sf(ssi, dsn = fout)
+} else {
+  ssi <- st_read(fout) ## TODO: use prepInputs using 7z file from gdrive
 }
+
+ssi_reproj <- st_transform(ssi, ._CRS_MAPS_.)
+r_ssi <- fasterize(ssi_reproj, raster(west.boreal[west.boreal$NAME_1 == "Alberta"], res = ._RES_MAPS_.), "MPB_SSI")
+writeRaster(r_ssi, file.path(maps.dir, "MPB", "ab_mpb_ssi.tif"))
 ```
 
 ## MPB red attack data
@@ -282,49 +252,63 @@ if (isTRUE(._MAPS_USERAW_.) && (._OS_. == "Windows") &&
 
 ```{r standardize-ab-data}
 ## GDAL can only open GDB files on Windows
-if (isTRUE(._MAPS_USERAW_.) && (._OS_. == "Windows") &&
-    (NROW(subset(ogrDrivers(), grepl("GDB", name))) > 0)) {
-  f <- file.path(maps.dir, "MPB", "MPB_AERIAL_SURVEY.gdb")
-  stopifnot(file.exists(f))
-  
-  ## List all feature classes in a file geodatabase
-  fc_list <- ogrListLayers(f)
-  print(fc_list)
-  
-  ## each layer represents data for a single year (2 of the last 3 characters in the name)
-  years <- str_sub(fc_list, 10, 12)
-  years <- ifelse(years < 50, paste0(20, years), paste0(19, years))
-  
-  ## Read the feature class
-  layers <- structure( vector("list", length(years)) , names = years)
-  i <- 1
-  lapply(fc_list, function(x) {
-    fc <- st_read(dsn = f, layer = x)
-    layers[[i]] <<- fc
-    i <<- i + 1
-  })
-  
-  ## Determine the FC extent, projection, and attribute information
-  lapply(layers, summary)
-  
-  ## Extract points and polygon data into separate lists
-  id_pnts <- which(substring(names(layers), 5, 5) == "x")
-  id_poly <- which(substring(names(layers), 5, 5) == "p")
-  
-  ab_pnts <- layers[id_pnts]
-  ab_poly <- layers[id_poly]
-  
-  ## order by year
-  ab_pnts <- ab_pnts[order(names(ab_pnts))]
-  ab_poly <- ab_poly[order(names(ab_poly))]
-  ab_poly$`2018p` <- NULL ## TODO: remove this empty polygon
-  
-  stopifnot(all(sapply(ab_pnts, function(x) is(x$Shape, class2 = "sfc_POINT"))))
-  stopifnot(all(sapply(ab_poly, function(x) is(x$Shape, class2 = "sfc_MULTIPOLYGON"))))
-  rm(layers)
+if (isTRUE(._MAPS_USERAW_.)) {
+  if (isTRUE((._OS_. == "Windows") && (NROW(subset(ogrDrivers(), grepl("GDB", name))) > 0))) {
+    f <- file.path(maps.dir, "MPB", "MPB_AERIAL_SURVEY.gdb")
+    stopifnot(file.exists(f))
+    
+    ## List all feature classes in a file geodatabase
+    fc_list <- ogrListLayers(f)
+    print(fc_list)
+    
+    ## each layer represents data for a single year (2 of the last 3 characters in the name)
+    years <- str_sub(fc_list, 10, 12)
+    years <- ifelse(years < 50, paste0(20, years), paste0(19, years))
+    
+    ## Read the feature class
+    layers <- structure(vector("list", length(years)), names = years)
+    i <- 1
+    lapply(fc_list, function(x) {
+      fc <- st_read(dsn = f, layer = x)
+      layers[[i]] <<- fc
+      i <<- i + 1
+    })
+    
+    ## Determine the FC extent, projection, and attribute information
+    lapply(layers, summary)
+    
+    ## Extract points and polygon data into separate lists
+    id_pnts <- which(substring(names(layers), 5, 5) == "x")
+    id_poly <- which(substring(names(layers), 5, 5) == "p")
+    
+    ab_pnts <- layers[id_pnts]
+    ab_poly <- layers[id_poly]
+    
+    ## order by year
+    ab_pnts <- ab_pnts[order(names(ab_pnts))]
+    ab_poly <- ab_poly[order(names(ab_poly))]
+    ab_poly$`2018p` <- NULL ## TODO: remove this empty polygon
+    
+    stopifnot(all(sapply(ab_pnts, function(x) is(x$Shape, class2 = "sfc_POINT"))))
+    stopifnot(all(sapply(ab_poly, function(x) is(x$Shape, class2 = "sfc_MULTIPOLYGON"))))
+    rm(layers)
+  } else if (isFALSE(is.null(conn))) {
+    ## TODO: needs to fully match up with above
+    years <- 2001:2019
+    
+    ab_pnts <- ab_poly <- structure(vector("list", length(years)), names = years)
+    i <- 1
+    lapply(years, function(x) {
+      pnts <- st_read(dsn = gisDBconn, layer = paste0("MPB_AB_", x, "_pnts"))
+      #poly <- st_read(dsn = gisDBconn, layer = paste0("MPB_AB_", x, "_poly")) ## 2001 missing? 2018 empty?
+      ab_pnts[[i]] <<- pnts
+      #ab_poly[[i]] <<- poly
+      i <<- i + 1
+    })
+  }
   
   ## save to shapefiles
-  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2018") %>% checkPath(create = TRUE)
+  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2019") %>% checkPath(create = TRUE)
   
   lapply(ab_pnts, function(x) {
     year <- max(unique(c(x$BEETLE_YR, x$SURVYEAR, x$SURV_YEAR, x$survyear)), na.rm = TRUE)
@@ -349,7 +333,8 @@ if (isTRUE(._MAPS_USERAW_.)) {
   
   #output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2011")
   #output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2016")
-  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2018")
+  #output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2018")
+  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2019")
   ab.pnts.files <- dir(path = output.dir, pattern = "spot")
   ab.pnts.dir.shp <- unique(sapply(strsplit(ab.pnts.files, "\\."), function(x) x[[1]]))
   
@@ -435,7 +420,7 @@ data_zip <- list(
   paste0(url, "2013/FHF_2013_Jan24.zip"),
   paste0(url, "2014/2014_FHF_Jan23.zip"),
   paste0(url, "2015/final_prov_data/FHF_spatial_Feb11.zip"),
-  paste0(url, "2016/AOS_2016_Shapefiles_and_TSA_Spreadsheet_Jan25.zip")
+  paste0(url, "2016/AOS_2016_Shapefiles_and_TSA_Spreadsheet_Jan25.zip") ## TODO: add 2017 onward
 )
 
 ## the 1999 data are visible, but downloads fail (404)
