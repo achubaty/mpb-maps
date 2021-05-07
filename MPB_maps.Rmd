@@ -72,18 +72,17 @@ rasterOptions(
 ## set work dirs based on computer used
 if (isTRUE(._USER_. == "achubaty")) {
   if (._OS_. == "Linux") {
-    maps.dir <- "~/data"
-    work.dir <- "~/Documents/GitHub/MPB/mpb-maps"
+    maps.dir <- checkPath("~/data")
+    work.dir <- checkPath("~/GitHub/MPB/mpb-maps")
   }
 }
-setwd(work.dir)
 rdata.path <- file.path(maps.dir, "MPB", "Rmaps") %>% checkPath(create = TRUE)
 fig.path <- file.path(work.dir, "figures") %>% checkPath(create = TRUE)
 
 stopifnot(all(dir.exists(c(fig.path, maps.dir, rdata.path, work.dir))))
 
 ## additional options
-._NUM_CPUS_. <- min(parallel::detectCores() / 2, 16) ## max cpus to use
+._NUM_CPUS_. <- min(parallel::detectCores() / 2, 19) ## max cpus to use
 
 # options below only need to be changed if you want to reprocess the data
 # - e.g., you get new MPB map data
@@ -373,7 +372,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
   
   # save these new map objects for later use
   saveObjects("ab.pnts.boreal.raster.stack", rdata.path)
-  writeRaster(ab.pnts.boreal.raster.stack, file.path(rdata.path, "MPB_AB_pnts_1998-2016.tif"))
+  writeRaster(ab.pnts.boreal.raster.stack, file.path(rdata.path, "MPB_AB_pnts_2001-2019.tif"))
   
   ## cleanup workspace
   rm(ab.pnts.dir.shp, ab.pnts.files, ab.pnts.boreal.raster.stack, west.boreal.raster)
