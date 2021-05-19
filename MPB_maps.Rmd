@@ -296,13 +296,13 @@ if (isTRUE(._MAPS_USERAW_.)) {
     rm(layers)
   } else if (isFALSE(is.null(conn))) {
     ## TODO: needs to fully match up with above
-    years <- 2001:2019
+    years <- 2001:2020
     
     ab_pnts <- ab_poly <- structure(vector("list", length(years)), names = years)
     i <- 1
     lapply(years, function(x) {
       pnts <- st_read(dsn = gisDBconn, layer = paste0("MPB_AB_", x, "_pnts"))
-      #poly <- st_read(dsn = gisDBconn, layer = paste0("MPB_AB_", x, "_poly")) ## 2001 missing? 2018 empty?
+      #poly <- st_read(dsn = gisDBconn, layer = paste0("MPB_AB_", x, "_poly")) ## many years missing poly data
       ab_pnts[[i]] <<- pnts
       #ab_poly[[i]] <<- poly
       i <<- i + 1
