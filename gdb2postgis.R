@@ -1,7 +1,7 @@
 readRenviron(".Renviron")
 
 library(Require)
-Require(c("RPostgres", "rgdal", "sf", "ggplot2", "ggspatial"))
+Require(c("ggplot2", "ggspatial", "RPostgres", "rgdal", "sf"))
 
 stopifnot(Sys.info()[["sysname"]] == "Windows") ## R can only work with .gdb files on Windows
 subset(st_drivers(), grepl("GDB", name))
@@ -22,8 +22,13 @@ write2db <- function(x, f, conn) {
 
   tmp <- st_read(f, layer = x)
   st_crs(tmp) <- 3400
-  st_write(tmp, conn, layer = paste0("MPB_AB_", yr_, "_", polypnts))
-  rm(tmp)
+
+  ## 2018 polygon has no features, so don't bother writing it
+  if (yr_ != 2018 && polypnts != "poly") {
+    st_write(tmp, conn, layer = paste0("MPB_AB_", yr_, "_", polypnts))
+  }
+
+  tmp
 }
 
 ## ---------------------------------------------------------------------------------------------- ##
@@ -47,7 +52,15 @@ print(fc_list_2019)
 
 mpb_2019 <- lapply(fc_list_2019, write2db, f = f_mpb_2019, conn = conn)
 
-mpb <- append(mpb, mpb_2019)
+f_mpb_2020 <- normalizePath(file.path(dataDir, "MPB_AERIAL_SURVEY_2020.gdb"))
+stopifnot(file.exists(f_mpb_2020))
+
+fc_list_2020 <- ogrListLayers(f_mpb_2020)
+print(fc_list_2020)
+
+mpb_2020 <- lapply(fc_list_2020, write2db, f = f_mpb_2020, conn = conn)
+
+mpb <- append(mpb, mpb_2019, mpb_2020)
 
 ## ---------------------------------------------------------------------------------------------- ##
 
@@ -58,6 +71,7 @@ fc_list <- ogrListLayers(f)
 print(fc_list)
 
 ssi <- st_read(dsn = f, layer = "STAND_SUSC_INDEX_MPB")
+all(st_is_valid(ssi))
 
 st_write(ssi, conn, layer = "MPB_AB_SSI")
 
