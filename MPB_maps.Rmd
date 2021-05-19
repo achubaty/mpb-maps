@@ -83,7 +83,7 @@ fig.path <- file.path(work.dir, "figures") %>% checkPath(create = TRUE)
 stopifnot(all(dir.exists(c(fig.path, maps.dir, rdata.path, work.dir))))
 
 ## additional options
-._NUM_CPUS_. <- min(parallel::detectCores() / 2, 19) ## max cpus to use
+._NUM_CPUS_. <- min(parallel::detectCores() / 2, 20) ## max cpus to use
 
 # options below only need to be changed if you want to reprocess the data
 # - e.g., you get new MPB map data
@@ -97,7 +97,7 @@ stopifnot(all(dir.exists(c(fig.path, maps.dir, rdata.path, work.dir))))
 ._RES_MAPS_. <- 250.0     ## map resolution, in metres
 ._PRJ_MAPS_. <- paste("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95",
                       "+x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
-._CRS_MAPS_. <- structure(list(epsg = NA_integer_, proj4string = ._PRJ_MAPS_.), class = "crs")
+._CRS_MAPS_. <- st_crs(._PRJ_MAPS_.)
 ## map projection to use (matches kNN data)
 ```
 
@@ -150,8 +150,10 @@ if (isTRUE(._MAPS_USERAW_.)) {
 
 ```{r import-maps-boreal}
 if (isTRUE(._MAPS_USERAW_.)) {
-  west <- CAN_adm1[CAN_adm1$NAME_1 %in% c("Alberta", "Saskatchewan"), ]
-  west <- Cache(postProcess, west, targetCRS = ._PRJ_MAPS_., filename2 = NULL)
+  west.provs <- c("Alberta", "Saskatchewan") ## "British Columbia"
+  canada1.west <- CAN_adm1[CAN_adm1$NAME_1 %in% west.provs, ]
+  canada2.west <- CAN_adm2[CAN_adm2$NAME_1 %in% west.provs, ]
+  west <- Cache(postProcess, canada1.west, targetCRS = ._PRJ_MAPS_., filename2 = NULL)
   
   files <- file.path(rdata.path, c("boreal.RData", "boreal.can.RData"))
   if (all(file.exists(files))) {
@@ -162,7 +164,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
                     alsoExtract = "similar",
                     archive = asPath("boreal.zip"),
                     destinationPath = maps.dir,
-                    url = "http://cfs.nrcan.gc.ca/common/boreal.zip",
+                    url = "http://cfs.nrcan.gc.ca/common/boreal.zip", ## TODO: update URL
                     fun = "sf::read_sf",
                     useSAcrs = TRUE,
                     studyArea = west,
@@ -173,10 +175,6 @@ if (isTRUE(._MAPS_USERAW_.)) {
     save(boreal.can, file = files[2])
   }
   rm(files)
-  
-  west.provs <- c("Alberta", "British Columbia", "Saskatchewan")
-  canada1.west <- CAN_adm1[CAN_adm1$NAME_1 %in% west.provs, ]
-  canada2.west <- CAN_adm2[CAN_adm2$NAME_1 %in% west.provs, ]
 
   west.boreal <- st_transform(st_as_sf(canada1.west), ._CRS_MAPS_.)
   west2.boreal <- st_transform(st_as_sf(canada2.west), ._CRS_MAPS_.)
@@ -228,6 +226,7 @@ if (isTRUE(._MAPS_USERAW_.) && (._OS_. == "Windows") &&
   write_sf(ssi, dsn = fout)
 } else {
   ssi <- st_read(fout) ## TODO: use prepInputs using 7z file from gdrive
+  ## https://drive.google.com/file/d/1HTooSX_QWFRzi7d5ZItL7VmXwyrylpOm/
 }
 
 ssi_reproj <- st_transform(ssi, ._CRS_MAPS_.)
@@ -242,12 +241,10 @@ writeRaster(r_ssi, file.path(maps.dir, "MPB", "ab_mpb_ssi.tif"))
 #### Download all AB MPB data
 
 ```{r download-ab-mpb}
-##  file originally downloaded from:
-##    ftp://ftp.env.gov.ab.ca/pub/MPB/Data/MPB_AERIAL_SURVEY.gdb.7z
-##
-##  [ password protected archive, downloaded October 19, 2016                       ]
-##  [ see email from Aaron McGill (Aaron.McGill@gov.ab.ca) forwarded by Barry Cooke ]
-##
+## TODO: prepInputs these
+## 1975-2018:  https://drive.google.com/file/d/11YoAxkHzWNsNGkNtoe5ph5BdT5xXUoGg/
+## 2019:       https://drive.google.com/file/d/1vhSLJf03KTi0Oeec_pSiwK7EQZYd_PlF/
+## 2020:       https://drive.google.com/file/d/1S5Lw5g5ACcTyhf8kwR7sqwPzGOCjfpwB/
 ```
 
 #### Standardize AB MPB data
@@ -256,6 +253,9 @@ writeRaster(r_ssi, file.path(maps.dir, "MPB", "ab_mpb_ssi.tif"))
 ## GDAL can only open GDB files on Windows
 if (isTRUE(._MAPS_USERAW_.)) {
   if (isTRUE((._OS_. == "Windows") && (NROW(subset(ogrDrivers(), grepl("GDB", name))) > 0))) {
+    
+    ## TODO: update this block to include 2019 and 2020 data
+    
     f <- file.path(maps.dir, "MPB", "MPB_AERIAL_SURVEY.gdb")
     stopifnot(file.exists(f))
     
@@ -295,22 +295,29 @@ if (isTRUE(._MAPS_USERAW_.)) {
     stopifnot(all(sapply(ab_poly, function(x) is(x$Shape, class2 = "sfc_MULTIPOLYGON"))))
     rm(layers)
   } else if (isFALSE(is.null(conn))) {
-    ## TODO: needs to fully match up with above
-    years <- 2001:2020
+    ## TODO: needs to fully match up with above (i.e., get poly data too)
+    years_pnts <- 2001:2020 # also 1998
+    years_poly <- c(2004:2006, 2009:2011, 2014:2017) ## also 1975:1991, 1994
     
-    ab_pnts <- ab_poly <- structure(vector("list", length(years)), names = years)
+    ab_pnts <- structure(vector("list", length(years_pnts)), names = years_pnts)
     i <- 1
-    lapply(years, function(x) {
+    lapply(years_pnts, function(x) {
       pnts <- st_read(dsn = gisDBconn, layer = paste0("MPB_AB_", x, "_pnts"))
-      #poly <- st_read(dsn = gisDBconn, layer = paste0("MPB_AB_", x, "_poly")) ## many years missing poly data
       ab_pnts[[i]] <<- pnts
-      #ab_poly[[i]] <<- poly
+      i <<- i + 1
+    })
+    
+    ab_poly <- structure(vector("list", length(years_poly)), names = years_poly)
+    i <- 1
+    lapply(years_poly, function(x) {
+      poly <- st_read(dsn = gisDBconn, layer = paste0("MPB_AB_", x, "_poly"))
+      ab_poly[[i]] <<- poly
       i <<- i + 1
     })
   }
   
   ## save to shapefiles
-  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2019") %>% checkPath(create = TRUE)
+  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2020") %>% checkPath(create = TRUE)
   
   lapply(ab_pnts, function(x) {
     year <- max(unique(c(x$BEETLE_YR, x$SURVYEAR, x$SURV_YEAR, x$survyear)), na.rm = TRUE)
@@ -333,10 +340,9 @@ if (isTRUE(._MAPS_USERAW_.)) {
 if (isTRUE(._MAPS_USERAW_.)) {
   loadObjects("west.boreal.raster", rdata.path)
   
-  #output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2011")
-  #output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2016")
   #output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2018")
-  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2019")
+  #output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2019")
+  output.dir <- file.path(maps.dir, "MPB", "ab_mpb_2020")
   ab.pnts.files <- dir(path = output.dir, pattern = "spot")
   ab.pnts.dir.shp <- unique(sapply(strsplit(ab.pnts.files, "\\."), function(x) x[[1]]))
   
@@ -350,20 +356,18 @@ if (isTRUE(._MAPS_USERAW_.)) {
     function(shp, crs, maps.dir, output.dir, rdata.path, rtm) {
       yr <- strsplit(shp, "_")[[1]][3] %>% substr(1, 4)
       pnts <- st_read(file.path(output.dir, extension(shp, ".shp")))
-      names(pnts) <- c(toupper(names(pnts)[-length(names(pnts))]), "geometry")
-      
-      pnts.boreal <- st_transform(pnts, crs) ## TODO: is this necessary?
-      if (is.null(pnts.boreal$NUM_TREES)) {
-        warning("AB points data: missing 'NUM_TREES' for year ", yr, ".")
+      if (is.null(pnts[["NUM_TREES"]])) {
+        pnts <- dplyr::rename(pnts, NUM_TREES = num_trees)
       }
+      
+      pnts.boreal <- st_transform(pnts, crs)
       
       ## rasterize (fasterize can't use points; gdal_rasterize isn't working either)
       fout <- file.path(rdata.path, paste0("MPB_AB_pnts_", yr, ".tif"))
       out <- rasterize(pnts.boreal, rtm,
-                       field = as.numeric(pnts.boreal$NUM_TREES), fun = "sum",
+                       field = as.numeric(pnts.boreal[["NUM_TREES"]]), fun = "sum",
                        filename = extension(fout, ".grd"), overwrite = TRUE)
       writeRaster(out, filename = fout, overwrite = TRUE)
-      return(out)
     },
     crs = ._CRS_MAPS_., maps.dir = maps.dir, output.dir = output.dir,
     rdata.path = rdata.path, rtm = west.boreal.raster
@@ -375,7 +379,7 @@ if (isTRUE(._MAPS_USERAW_.)) {
   
   # save these new map objects for later use
   saveObjects("ab.pnts.boreal.raster.stack", rdata.path)
-  writeRaster(ab.pnts.boreal.raster.stack, file.path(rdata.path, "MPB_AB_pnts_2001-2019.tif"))
+  writeRaster(ab.pnts.boreal.raster.stack, file.path(rdata.path, "MPB_AB_pnts_2001-2020.tif"))
   
   ## cleanup workspace
   rm(ab.pnts.dir.shp, ab.pnts.files, ab.pnts.boreal.raster.stack, west.boreal.raster)
