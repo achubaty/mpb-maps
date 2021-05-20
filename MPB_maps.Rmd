@@ -357,7 +357,11 @@ if (isTRUE(._MAPS_USERAW_.)) {
       yr <- strsplit(shp, "_")[[1]][3] %>% substr(1, 4)
       pnts <- st_read(file.path(output.dir, extension(shp, ".shp")))
       if (is.null(pnts[["NUM_TREES"]])) {
-        pnts <- dplyr::rename(pnts, NUM_TREES = num_trees)
+        pnts <- if ("num_trees" %in% names(pnts)) {
+          dplyr::rename(pnts, NUM_TREES = num_trees)
+        } else if ("num_trs" %in% names(pnts)) {
+          dplyr::rename(pnts, NUM_TREES = num_trs)
+        }
       }
       
       pnts.boreal <- st_transform(pnts, crs)
@@ -379,7 +383,8 @@ if (isTRUE(._MAPS_USERAW_.)) {
   
   # save these new map objects for later use
   saveObjects("ab.pnts.boreal.raster.stack", rdata.path)
-  writeRaster(ab.pnts.boreal.raster.stack, file.path(rdata.path, "MPB_AB_pnts_2001-2020.tif"))
+  writeRaster(ab.pnts.boreal.raster.stack, file.path(rdata.path, "MPB_AB_pnts_2001-2020.tif"),
+              overwrite = TRUE)
   
   ## cleanup workspace
   rm(ab.pnts.dir.shp, ab.pnts.files, ab.pnts.boreal.raster.stack, west.boreal.raster)
